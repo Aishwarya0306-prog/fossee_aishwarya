@@ -1,0 +1,47 @@
+<nav aria-label="Page navigation" class="my-4">
+    <ul class="pagination justify-content-center">
+
+        {% if objects.has_previous %}
+        <li class="page-item">
+            <a class="page-link shadow-sm" href="?page=1{{ request.GET.urlencode|cut:'page='|cut:objects.number }}" aria-label="First">
+                <span aria-hidden="true">&laquo;&laquo;</span>
+            </a>
+        </li>
+        <li class="page-item">
+            <a class="page-link shadow-sm" href="?page={{ objects.previous_page_number }}{{ request.GET.urlencode|cut:'page='|cut:objects.number }}" aria-label="Previous">
+                <span aria-hidden="true">&lsaquo;</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link text-muted">&lsaquo;</span></li>
+        {% endif %}
+
+        {% for n in objects.paginator.page_range %}
+            {% if objects.number == n %}
+                <li class="page-item active" aria-current="page">
+                    <span class="page-link shadow-sm">{{ n }}</span>
+                </li>
+            {% elif n > objects.number|add:'-3' and n < objects.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link shadow-sm" href="?page={{ n }}{{ request.GET.urlencode|cut:'page='|cut:objects.number }}">{{ n }}</a>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if objects.has_next %}
+        <li class="page-item">
+            <a class="page-link shadow-sm" href="?page={{ objects.next_page_number }}{{ request.GET.urlencode|cut:'page='|cut:objects.number }}" aria-label="Next">
+                <span aria-hidden="true">&rsaquo;</span>
+            </a>
+        </li>
+        <li class="page-item">
+            <a class="page-link shadow-sm" href="?page={{ objects.paginator.num_pages }}{{ request.GET.urlencode|cut:'page='|cut:objects.number }}" aria-label="Last">
+                <span aria-hidden="true">&raquo;&raquo;</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link text-muted">&rsaquo;</span></li>
+        {% endif %}
+
+    </ul>
+</nav>
