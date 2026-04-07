@@ -1,47 +1,212 @@
-<nav aria-label="Page navigation" class="my-4">
-    <ul class="pagination justify-content-center">
+{% extends 'workshop_app/base.html' %}
 
-        {% if objects.has_previous %}
-        <li class="page-item">
-            <a class="page-link shadow-sm" href="?page=1{{ request.GET.urlencode|cut:'page='|cut:objects.number }}" aria-label="First">
-                <span aria-hidden="true">&laquo;&laquo;</span>
-            </a>
-        </li>
-        <li class="page-item">
-            <a class="page-link shadow-sm" href="?page={{ objects.previous_page_number }}{{ request.GET.urlencode|cut:'page='|cut:objects.number }}" aria-label="Previous">
-                <span aria-hidden="true">&lsaquo;</span>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled"><span class="page-link text-muted">&lsaquo;</span></li>
-        {% endif %}
+{% block title %}Profile Statistics Dashboard{% endblock %}
 
-        {% for n in objects.paginator.page_range %}
-            {% if objects.number == n %}
-                <li class="page-item active" aria-current="page">
-                    <span class="page-link shadow-sm">{{ n }}</span>
-                </li>
-            {% elif n > objects.number|add:'-3' and n < objects.number|add:'3' %}
-                <li class="page-item">
-                    <a class="page-link shadow-sm" href="?page={{ n }}{{ request.GET.urlencode|cut:'page='|cut:objects.number }}">{{ n }}</a>
-                </li>
-            {% endif %}
-        {% endfor %}
+{% block extra_css %}
+<style>
+    /* Gradient Background for the whole page */
+    body {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+    }
 
-        {% if objects.has_next %}
-        <li class="page-item">
-            <a class="page-link shadow-sm" href="?page={{ objects.next_page_number }}{{ request.GET.urlencode|cut:'page='|cut:objects.number }}" aria-label="Next">
-                <span aria-hidden="true">&rsaquo;</span>
-            </a>
-        </li>
-        <li class="page-item">
-            <a class="page-link shadow-sm" href="?page={{ objects.paginator.num_pages }}{{ request.GET.urlencode|cut:'page='|cut:objects.number }}" aria-label="Last">
-                <span aria-hidden="true">&raquo;&raquo;</span>
-            </a>
-        </li>
-        {% else %}
-        <li class="page-item disabled"><span class="page-link text-muted">&rsaquo;</span></li>
-        {% endif %}
+    /* Modern Segmented Control for Toggles */
+    .toggle-container {
+        background: rgba(0, 0, 0, 0.05);
+        padding: 5px;
+        border-radius: 30px;
+        display: inline-flex;
+        margin-bottom: 25px;
+    }
 
-    </ul>
-</nav>
+    .toggle-btn {
+        padding: 10px 24px;
+        border: none;
+        border-radius: 25px;
+        background: transparent;
+        font-weight: 600;
+        color: #555;
+        transition: all 0.3s ease;
+    }
+
+    .toggle-btn.active {
+        background: white;
+        color: #0d6efd;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    /* Enhanced Card Design */
+    .stats-card {
+        background: rgba(255, 255, 255, 0.95);
+        border: none;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        backdrop-filter: blur(10px);
+    }
+
+    /* Table Styling */
+    .table {
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+
+    .table thead th {
+        border: none;
+        color: #6c757d;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+        padding-bottom: 15px;
+    }
+
+    .table tbody tr {
+        background-color: white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        transition: transform 0.2s ease;
+    }
+
+    .table tbody tr:hover {
+        transform: scale(1.01);
+        background-color: #f8faff !important;
+    }
+
+    .table td {
+        border: none;
+        padding: 15px;
+        vertical-align: middle;
+    }
+
+    .table td:first-child { border-radius: 10px 0 0 10px; }
+    .table td:last-child { border-radius: 0 10px 10px 0; }
+
+    .hidden { display: none; }
+    
+    .page-title {
+        font-weight: 800;
+        color: #2d3436;
+        letter-spacing: -1px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2 class="page-title">📊 Profile Statistics</h2>
+            <p class="text-muted">Manage and monitor workshop activity across roles.</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <div class="toggle-container">
+                <button id="btn-instructor" class="toggle-btn active" onclick="showSection('instructor')">
+                    Instructors
+                </button>
+                <button id="btn-coordinator" class="toggle-btn" onclick="showSection('coordinator')">
+                    Coordinators
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-card">
+        
+        <div id="instructor_data">
+            <h5 class="fw-bold mb-4 text-primary">Instructor Performance</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>User</th>
+                            <th>Institute</th>
+                            <th>Phone</th>
+                            <th class="text-center">Workshops</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for profile_data in instructor_data %}
+                        <tr>
+                            <td class="text-muted">{{ forloop.counter }}</td>
+                            <td>
+                                <div class="fw-bold text-dark">{{ profile_data.profile.user.get_full_name }}</div>
+                                <small class="text-muted">@{{ profile_data.profile.user.username }}</small>
+                            </td>
+                            <td>{{ profile_data.profile.institute }}</td>
+                            <td>{{ profile_data.profile.phone_number }}</td>
+                            <td class="text-center">
+                                <span class="badge rounded-pill bg-primary px-3">{{ profile_data.count }}</span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center py-5 text-muted">No instructors found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="coordinator_data" class="hidden">
+            <h5 class="fw-bold mb-4 text-success">Coordinator Activity</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Institute</th>
+                            <th>Joined</th>
+                            <th class="text-center">Workshops</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for profile_data in coordinator_data %}
+                            {% if profile_data.count > 0 %}
+                            <tr>
+                                <td class="text-muted">{{ forloop.counter }}</td>
+                                <td>
+                                    <a href="{{ URL_ROOT }}/view_comment_profile/{{ profile_data.profile.user.id }}" class="text-decoration-none fw-bold text-dark">
+                                        {{ profile_data.profile.user.get_full_name }}
+                                    </a>
+                                </td>
+                                <td>{{ profile_data.profile.institute }}</td>
+                                <td>{{ profile_data.profile.user.date_joined|date:"M Y" }}</td>
+                                <td class="text-center">
+                                    <span class="badge rounded-pill bg-success px-3">{{ profile_data.count }}</span>
+                                </td>
+                            </tr>
+                            {% endif %}
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center py-5 text-muted">No active coordinators found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+function showSection(type) {
+    const instructor = document.getElementById('instructor_data');
+    const coordinator = document.getElementById('coordinator_data');
+    const btnI = document.getElementById('btn-instructor');
+    const btnC = document.getElementById('btn-coordinator');
+
+    if (type === 'instructor') {
+        instructor.classList.remove('hidden');
+        coordinator.classList.add('hidden');
+        btnI.classList.add('active');
+        btnC.classList.remove('active');
+    } else {
+        coordinator.classList.remove('hidden');
+        instructor.classList.add('hidden');
+        btnC.classList.add('active');
+        btnI.classList.remove('active');
+    }
+}
+</script>
+{% endblock %}
