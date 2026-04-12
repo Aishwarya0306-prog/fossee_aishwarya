@@ -1,0 +1,641 @@
+{% extends 'workshop_app/base.html' %}
+
+{% block title %}Workshop Statistics{% endblock %}
+
+{% block extra %}
+  {# ── Flatpickr date picker ───────────────────────────────────── #}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+  {# ── Chart.js 4 (single copy) ────────────────────────────────── #}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+  {# ── Google GeoChart ─────────────────────────────────────────── #}
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+
+  <style>
+    /* ── Tokens ───────────────────────────────────────────────── */
+    :root {
+      --accent:      #4f46e5;
+      --accent-2:    #10b981;
+      --accent-3:    #f59e0b;
+      --accent-4:    #ef4444;
+      --bg-card:     #ffffff;
+      --bg-page:     #f4f6fb;
+      --text-1:      #1e1e2e;
+      --text-2:      #6b7280;
+      --border:      #e5e7eb;
+      --radius:      12px;
+      --shadow:      0 2px 10px rgba(0,0,0,.07);
+    }
+
+    body { background: var(--bg-page); color: var(--text-1); }
+
+    /* ── Section card ─────────────────────────────────────────── */
+    .ws-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .ws-card-title {
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-2);
+      margin-bottom: 1.1rem;
+    }
+
+    /* ── Chart-type pill switcher ─────────────────────────────── */
+    .chart-switcher {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-page);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      width: fit-content;
+    }
+    .chart-pill {
+      border: none;
+      background: transparent;
+      border-radius: 7px;
+      padding: .35rem 1rem;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--text-2);
+      cursor: pointer;
+      transition: all .18s;
+      white-space: nowrap;
+    }
+    .chart-pill.active { background: var(--accent); color: #fff; }
+    .chart-pill:hover:not(.active) { background: var(--border); }
+
+    /* ── Summary stats row ────────────────────────────────────── */
+    .stat-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-chip {
+      flex: 1 1 140px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+    .stat-chip-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-2); margin-bottom: .3rem; }
+    .stat-chip-value { font-size: 1.6rem; font-weight: 800; color: var(--text-1); line-height: 1; }
+    .stat-chip-sub   { font-size: .73rem; color: var(--text-2); margin-top: .2rem; }
+    .stat-chip.a1 { border-top: 3px solid var(--accent); }
+    .stat-chip.a2 { border-top: 3px solid var(--accent-2); }
+    .stat-chip.a3 { border-top: 3px solid var(--accent-3); }
+    .stat-chip.a4 { border-top: 3px solid var(--accent-4); }
+
+    /* ── Date form ────────────────────────────────────────────── */
+    .date-form-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: .75rem;
+    }
+    .date-field { display: flex; flex-direction: column; gap: .3rem; }
+    .date-field label { font-size: .78rem; font-weight: 600; color: var(--text-2); }
+    .date-field input {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .45rem .85rem;
+      font-size: .875rem;
+      color: var(--text-1);
+      background: var(--bg-card);
+      width: 160px;
+      outline: none;
+    }
+    .date-field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+    .btn-dl {
+      padding: .48rem 1.1rem;
+      border-radius: 8px;
+      font-size: .85rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn-dl:hover { opacity: .88; }
+    .btn-primary-ws { background: var(--accent);   color: #fff; }
+    .btn-success-ws { background: var(--accent-2); color: #fff; }
+
+    /* ── Alert messages ───────────────────────────────────────── */
+    .ws-alert {
+      padding: .65rem 1rem;
+      border-radius: 8px;
+      font-size: .85rem;
+      margin-top: .75rem;
+      border-left: 4px solid var(--accent);
+      background: #eef2ff;
+      color: #3730a3;
+    }
+    .ws-alert.success { border-color: var(--accent-2); background: #ecfdf5; color: #065f46; }
+    .ws-alert.error   { border-color: var(--accent-4); background: #fef2f2; color: #991b1b; }
+
+    /* ── Table ────────────────────────────────────────────────── */
+    .ws-table-wrap { overflow-x: auto; }
+    .ws-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: .855rem;
+    }
+    .ws-table thead th {
+      background: var(--bg-page);
+      color: var(--text-2);
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      padding: .75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .ws-table tbody tr { transition: background .12s; }
+    .ws-table tbody tr:hover { background: #f8f8ff; }
+    .ws-table tbody td {
+      padding: .8rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-1);
+      vertical-align: middle;
+    }
+    .ws-table tbody tr:last-child td { border-bottom: none; }
+    .ws-badge {
+      display: inline-block;
+      padding: .2rem .65rem;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 700;
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+    .ws-badge.green { background: #ecfdf5; color: #059669; }
+
+    /* ── Pagination ───────────────────────────────────────────── */
+    .ws-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .4rem;
+      margin-top: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .ws-page-btn {
+      min-width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-1);
+      font-size: .82rem;
+      font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+      text-decoration: none;
+      transition: all .15s;
+      padding: 0 .6rem;
+    }
+    .ws-page-btn:hover  { border-color: var(--accent); color: var(--accent); }
+    .ws-page-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .ws-page-btn.disabled { opacity: .4; pointer-events: none; }
+    .ws-page-info { font-size: .8rem; color: var(--text-2); }
+
+    /* ── India map modal ──────────────────────────────────────── */
+    .map-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1050;
+      background: rgba(0,0,0,.55);
+      align-items: center;
+      justify-content: center;
+    }
+    .map-overlay.open { display: flex; }
+    .map-modal {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      width: min(92vw, 900px);
+      overflow: hidden;
+    }
+    .map-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.4rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .map-modal-title { font-size: .95rem; font-weight: 700; margin: 0; }
+    .map-close {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: var(--text-2);
+      line-height: 1;
+    }
+    .map-close:hover { color: var(--accent-4); }
+    #visualization { width: 100%; height: 480px; }
+    #visualization path { stroke-width: 1; stroke: #fff; }
+
+    /* ── Permission notice ────────────────────────────────────── */
+    .ws-notice {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      color: #92400e;
+      font-size: .9rem;
+    }
+  </style>
+{% endblock %}
+
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+
+  {# ── Page header ───────────────────────────────────────────── #}
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+    <div>
+      <h1 style="font-size:1.35rem;font-weight:800;margin:0;">Workshop Statistics</h1>
+      <p style="margin:0;font-size:.85rem;color:var(--text-2);">Overview of all workshops, monthly counts, and state-wise distribution.</p>
+    </div>
+    {# Chart type switcher #}
+    <div class="chart-switcher" role="group" aria-label="Chart view">
+      <button class="chart-pill active" data-view="monthly" onclick="switchView('monthly', this)">Monthly Count</button>
+      <button class="chart-pill"        data-view="overall" onclick="switchView('overall', this)">Overall Count</button>
+      <button class="chart-pill"        data-view="map"     onclick="switchView('map',     this)">India Map</button>
+    </div>
+  </div>
+
+  {# ── Summary stat chips ────────────────────────────────────── #}
+  <div class="stat-chips">
+    <div class="stat-chip a1">
+      <div class="stat-chip-label">Total This Year</div>
+      <div class="stat-chip-value" id="chip-total">—</div>
+      <div class="stat-chip-sub">workshops conducted</div>
+    </div>
+    <div class="stat-chip a2">
+      <div class="stat-chip-label">Peak Month</div>
+      <div class="stat-chip-value" id="chip-peak">—</div>
+      <div class="stat-chip-sub" id="chip-peak-sub">highest count</div>
+    </div>
+    <div class="stat-chip a3">
+      <div class="stat-chip-label">Workshop Types</div>
+      <div class="stat-chip-value" id="chip-types">{{ workshoptype_count.0|length }}</div>
+      <div class="stat-chip-sub">distinct types</div>
+    </div>
+    <div class="stat-chip a4">
+      <div class="stat-chip-label">Top Type</div>
+      <div class="stat-chip-value" id="chip-top-type">—</div>
+      <div class="stat-chip-sub">most conducted</div>
+    </div>
+  </div>
+
+  {# ── Main chart panel ──────────────────────────────────────── #}
+  <div class="ws-card" id="chart-panel">
+    <div class="ws-card-title" id="chart-panel-title">Monthly workshops — {{ "now"|date:"Y" }}</div>
+    <div style="position:relative;height:340px;">
+      <canvas id="wsChart" role="img" aria-label="Workshop statistics chart"></canvas>
+    </div>
+  </div>
+
+  {# ── Date filter + upcoming workshops ──────────────────────── #}
+  {% if show_workshop_stats %}
+  <div class="ws-card">
+    <div class="ws-card-title">Upcoming workshops</div>
+
+    {# Date range form #}
+    <form method="POST" class="mb-4">
+      {% csrf_token %}
+      <div class="date-form-row">
+        <div class="date-field">
+          <label for="from">From</label>
+          <input type="text" id="from" name="from" placeholder="YYYY-MM-DD" autocomplete="off">
+        </div>
+        <div class="date-field">
+          <label for="to">To</label>
+          <input type="text" id="to" name="to" placeholder="YYYY-MM-DD" autocomplete="off">
+        </div>
+        <button class="btn-dl btn-success-ws" type="submit" name="View"     value="View">View</button>
+        <button class="btn-dl btn-primary-ws" type="submit" name="Download" value="Download">Download</button>
+      </div>
+    </form>
+
+    {# Django messages #}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="ws-alert {% if 'success' in message.tags %}success{% elif 'error' in message.tags %}error{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {# Workshops table #}
+    <div class="ws-table-wrap">
+      <table class="ws-table">
+        <thead>
+          <tr>
+            <th>Coordinator</th>
+            <th>Institute</th>
+            <th>Instructor</th>
+            <th>Workshop</th>
+            <th>Date</th>
+            <th>Requested by</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for workshop in upcoming_workshops %}
+            {% if workshop.proposed_workshop_date %}
+              <tr>
+                <td>{{ workshop.proposed_workshop_coordinator.get_full_name|capfirst }}</td>
+                <td>{{ workshop.proposed_workshop_coordinator.profile.institute|capfirst }}</td>
+                <td>{{ workshop.proposed_workshop_instructor.get_full_name }}</td>
+                <td>{{ workshop.proposed_workshop_title.workshoptype_name }}</td>
+                <td>{{ workshop.proposed_workshop_date|date:"d M Y" }}</td>
+                <td><span class="ws-badge">Coordinator</span></td>
+              </tr>
+            {% else %}
+              <tr>
+                <td>{{ workshop.requested_workshop_coordinator.get_full_name|capfirst }}</td>
+                <td>{{ workshop.requested_workshop_coordinator.profile.institute|capfirst }}</td>
+                <td>{{ workshop.requested_workshop_instructor.get_full_name }}</td>
+                <td>{{ workshop.requested_workshop_title.workshoptype_name }}</td>
+                <td>{{ workshop.requested_workshop_date|date:"d M Y" }}</td>
+                <td><span class="ws-badge green">Instructor</span></td>
+              </tr>
+            {% endif %}
+          {% empty %}
+            <tr>
+              <td colspan="6" style="text-align:center;color:var(--text-2);padding:2rem;">
+                No upcoming workshops found for the selected range.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Pagination #}
+    {% if upcoming_workshops.paginator.num_pages > 1 %}
+    <div class="ws-pagination">
+      <a class="ws-page-btn {% if not upcoming_workshops.has_previous %}disabled{% endif %}"
+         href="?page={{ upcoming_workshops.previous_page_number }}"
+         aria-label="Previous">&laquo;</a>
+
+      {% for num in upcoming_workshops.paginator.page_range %}
+        {% if num == upcoming_workshops.number %}
+          <span class="ws-page-btn active">{{ num }}</span>
+        {% elif num >= upcoming_workshops.number|add:"-2" and num <= upcoming_workshops.number|add:"2" %}
+          <a class="ws-page-btn" href="?page={{ num }}">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+
+      <a class="ws-page-btn {% if not upcoming_workshops.has_next %}disabled{% endif %}"
+         href="?page={{ upcoming_workshops.next_page_number }}"
+         aria-label="Next">&raquo;</a>
+
+      <span class="ws-page-info">
+        Page {{ upcoming_workshops.number }} of {{ upcoming_workshops.paginator.num_pages }}
+      </span>
+    </div>
+    {% endif %}
+
+  </div>
+  {% else %}
+  <div class="ws-notice">
+    Permission to view upcoming workshops is disabled. Set <code>show_workshop_stats = True</code> in <code>settings.py</code> to enable it.
+  </div>
+  {% endif %}
+
+</div>{# /container #}
+
+{# ── India map modal ───────────────────────────────────────────── #}
+<div class="map-overlay" id="mapOverlay" role="dialog" aria-modal="true" aria-label="India map">
+  <div class="map-modal">
+    <div class="map-modal-header">
+      <h2 class="map-modal-title">State-wise completed workshops — India</h2>
+      <button class="map-close" onclick="closeMap()" aria-label="Close map">&times;</button>
+    </div>
+    <div id="visualization"></div>
+  </div>
+</div>
+
+{# ── Scripts ───────────────────────────────────────────────────── #}
+<script>
+(function () {
+  'use strict';
+
+  /* ── Data from Django ──────────────────────────────────────── */
+  const monthlyData  = {{ workshop_count|safe }};
+  const typeLabels   = {{ workshoptype_count.0|safe }};
+  const typeData     = {{ workshoptype_count.1|safe }};
+  const indiaMapData = {{ india_map|safe }};
+
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun',
+                  'Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  /* ── Palette ───────────────────────────────────────────────── */
+  const COLORS = [
+    '#4f46e5','#10b981','#f59e0b','#ef4444',
+    '#8b5cf6','#06b6d4','#f97316','#ec4899',
+    '#14b8a6','#a855f7','#eab308','#64748b',
+  ];
+
+  /* ── Summary chips ─────────────────────────────────────────── */
+  const total    = monthlyData.reduce((a,b) => a + b, 0);
+  const peakIdx  = monthlyData.indexOf(Math.max(...monthlyData));
+  const typeTotal = typeData.reduce((a,b) => a + b, 0);
+  const topTypeIdx = typeData.indexOf(Math.max(...typeData));
+
+  document.getElementById('chip-total').textContent    = total;
+  document.getElementById('chip-peak').textContent     = monthlyData[peakIdx] ?? '—';
+  document.getElementById('chip-peak-sub').textContent = peakIdx >= 0 ? MONTHS[peakIdx] : '—';
+  document.getElementById('chip-top-type').textContent = typeLabels[topTypeIdx] ?? '—';
+
+  /* ── Chart.js instance ─────────────────────────────────────── */
+  let chart = null;
+
+  function buildChart(view) {
+    if (chart) chart.destroy();
+
+    const panelTitle = document.getElementById('chart-panel-title');
+    const ctx        = document.getElementById('wsChart');
+
+    if (view === 'monthly') {
+      panelTitle.textContent = `Monthly workshops — ${new Date().getFullYear()}`;
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: MONTHS,
+          datasets: [{
+            label: 'Workshops',
+            data:  monthlyData,
+            backgroundColor: COLORS.map(c => c + 'cc'),
+            borderColor:     COLORS,
+            borderWidth:     0,
+            borderRadius:    6,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => ` ${c.parsed.y} workshops` } },
+          },
+          scales: {
+            x: { grid: { display: false },
+                 ticks: { color: '#6b7280' } },
+            y: { beginAtZero: true,
+                 ticks: { color: '#6b7280', precision: 0 },
+                 grid:  { color: 'rgba(0,0,0,.05)' } },
+          },
+        },
+      });
+    }
+
+    else if (view === 'overall') {
+      panelTitle.textContent = 'Workshop type distribution';
+      chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: typeLabels,
+          datasets: [{
+            data:            typeData,
+            backgroundColor: COLORS,
+            borderColor:     '#fff',
+            borderWidth:     3,
+            hoverOffset:     8,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '60%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                color: '#6b7280', boxWidth: 12, boxHeight: 12, padding: 14,
+                font: { size: 12 },
+              },
+            },
+            tooltip: {
+              callbacks: {
+                label: c => {
+                  const pct = typeTotal
+                    ? ((c.parsed / typeTotal) * 100).toFixed(1)
+                    : 0;
+                  return ` ${c.parsed} workshops (${pct}%)`;
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+  }
+
+  /* ── View switcher ─────────────────────────────────────────── */
+  window.switchView = function (view, btn) {
+    document.querySelectorAll('.chart-pill')
+      .forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const chartPanel = document.getElementById('chart-panel');
+
+    if (view === 'map') {
+      chartPanel.style.display = 'none';
+      openMap();
+    } else {
+      chartPanel.style.display = '';
+      buildChart(view);
+    }
+  };
+
+  /* ── India map (Google GeoChart) ───────────────────────────── */
+  let mapLoaded = false;
+
+  window.openMap = function () {
+    document.getElementById('mapOverlay').classList.add('open');
+    if (!mapLoaded) {
+      mapLoaded = true;
+      google.charts.load('current', { packages: ['geochart'] });
+      google.charts.setOnLoadCallback(drawMap);
+    }
+  };
+
+  window.closeMap = function () {
+    document.getElementById('mapOverlay').classList.remove('open');
+    /* Reset the pill to the previous chart view */
+    document.querySelector('.chart-pill[data-view="monthly"]').click();
+  };
+
+  function drawMap() {
+    const data = google.visualization.arrayToDataTable(indiaMapData);
+    const opts = {
+      region:           'IN',
+      domain:           'IN',
+      displayMode:      'regions',
+      resolution:       'provinces',
+      datalessRegionColor: '#f1f5f9',
+      colorAxis:        { colors: ['#c7d2fe', '#4f46e5'] },
+      backgroundColor:  '#ffffff',
+      legend:           { position: 'bottom' },
+    };
+    const geo = new google.visualization.GeoChart(
+      document.getElementById('visualization')
+    );
+    geo.draw(data, opts);
+  }
+
+  /* Close map on overlay-background click */
+  document.getElementById('mapOverlay').addEventListener('click', function (e) {
+    if (e.target === this) closeMap();
+  });
+
+  /* Close map on Escape key */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeMap();
+  });
+
+  /* ── Flatpickr date pickers ────────────────────────────────── */
+  const today   = new Date();
+  const maxFrom = new Date(today); maxFrom.setDate(today.getDate() - 1);
+  const maxTo   = new Date(today); maxTo.setFullYear(today.getFullYear() + 1);
+
+  const fromPicker = flatpickr('#from', {
+    dateFormat:    'Y-m-d',
+    maxDate:       maxFrom,
+    disableMobile: true,
+    onChange([selected]) {
+      toPicker.set('minDate', selected);
+    },
+  });
+
+  const toPicker = flatpickr('#to', {
+    dateFormat:    'Y-m-d',
+    minDate:       today,
+    maxDate:       maxTo,
+    disableMobile: true,
+    onChange([selected]) {
+      fromPicker.set('maxDate', selected);
+    },
+  });
+
+  /* ── Init default chart ────────────────────────────────────── */
+  buildChart('monthly');
+})();
+</script>
+{% endblock %}
