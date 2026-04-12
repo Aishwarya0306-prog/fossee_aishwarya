@@ -1,0 +1,69 @@
+{% extends 'workshop_app/base.html' %}
+
+{% block title %}
+    Add New Workshop Type
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow p-4">
+        <h3 class="text-center mb-4">Create New Workshop Type</h3>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <!-- Non-field errors -->
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <!-- Workshop Name -->
+            <div class="mb-3 row">
+                <label class="col-sm-3 col-form-label fw-bold">Workshop Name</label>
+                <div class="col-sm-9">
+                    {{ form.name }}
+                    <div class="text-danger small">{{ form.name.errors }}</div>
+                </div>
+            </div>
+
+            <!-- Duration -->
+            <div class="mb-3 row">
+                <label class="col-sm-3 col-form-label fw-bold">Duration</label>
+                <div class="col-sm-9">
+                    {{ form.duration }}
+                    <div class="form-text">{{ form.duration.help_text }}</div>
+                    <div class="text-danger small">{{ form.duration.errors }}</div>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div class="mb-3 row">
+                <label class="col-sm-3 col-form-label fw-bold">Description</label>
+                <div class="col-sm-9">
+                    {{ form.description }}
+                    <div class="text-danger small">{{ form.description.errors }}</div>
+                </div>
+            </div>
+
+            <!-- Terms and Conditions -->
+            <div class="mb-3 row">
+                <label class="col-sm-3 col-form-label fw-bold">Terms & Conditions</label>
+                <div class="col-sm-9">
+                    {{ form.terms_and_conditions }}
+                    <div class="text-danger small">{{ form.terms_and_conditions.errors }}</div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="text-end">
+                <button type="submit" class="btn btn-primary px-4">
+                    Create
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
+{% endblock %}
